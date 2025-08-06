@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SMOL UI</title>
+  <link rel="stylesheet" href="src/styles.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Top Toolbar -->
+    <div class="toolbar">
+      <div class="toolbar-section">
+        <h1>SMOL UI</h1>
+      </div>
+    </div>
+
+    <!-- Tools Section -->
+    <div class="tools-section">
+      <div class="tools-group">
+        <label>TOOLS:</label>
+        <button class="tool-btn active" data-tool="draw">
+          <span class="icon">✏</span> DRAW
+        </button>
+        <button class="tool-btn" data-tool="erase">
+          <span class="icon">🗑</span> ERASE
+        </button>
+        <button class="tool-btn" data-tool="fill">
+          <span class="icon">🪣</span> FILL
+        </button>
+        <button class="tool-btn" data-tool="type">
+          <span class="icon">📝</span> TYPE
+        </button>
+        <button id="clearBtn" class="action-btn">CLEAR CANVAS</button>
+      </div>
+
+      <div class="toolbar-section">
+        <div class="color-controls">
+          <label for="colorPicker">COLOR:</label>
+          <input type="color" id="colorPicker" value="#ffffff">
+          <span id="colorDisplay">#00FF00</span>
+        </div>
+      </div>
+
+
+      <!-- Type Tool Controls -->
+      <div class="tools-group" id="typeToolGroup" style="display: none;">
+        <label for="fontSelector">FONT:</label>
+        <select id="fontSelector" class="font-selector">
+          <option value="">SELECT FONT</option>
+        </select>
+        <div class="type-info">
+          <span id="typeStatus">SELECT FONT TO START TYPING</span>
+        </div>
+        <div class="type-text-group">
+          <label for="typeTextInput">TEXT:</label>
+          <input type="text" id="typeTextInput" class="type-text-input" placeholder="Type here..." maxlength="20">
+        </div>
+        <div class="type-spacing-group">
+          <label for="typeSpacingSlider">SPACING:</label>
+          <input type="range" id="typeSpacingSlider" class="slider" min="0" max="8" value="0">
+          <span id="typeSpacingValue">0</span>
+        </div>
+      </div>
+
+      <div class="tools-group" id="brushShapeGroup">
+        <label>SHAPE:</label>
+        <button class="shape-btn active" data-shape="square">SQUARE</button>
+        <button class="shape-btn" data-shape="circle">CIRCLE</button>
+      </div>
+
+      <div class="tools-group" id="sizeGroup">
+        <label for="brushSize">SIZE:</label>
+        <input type="range" id="brushSize" class="slider" min="1" max="8" value="1">
+        <span id="brushSizeValue">1</span>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+      <!-- Canvas Container -->
+      <div class="canvas-container">
+        <!-- Canvas Tabs -->
+        <div class="canvas-tabs">
+          <button class="tab-btn active" data-canvas="pixel">COMPONENT CANVAS</button>
+          <button class="tab-btn" data-canvas="composition">DISPLAY COMPOSER</button>
+        </div>
+        
+
+        <!-- Canvas Content -->
+        <div class="canvas-content">
+          <!-- Save Controls -->
+          <div class="save-controls">
+            <div class="save-group">
+              <label for="canvasName">NAME:</label>
+              <input type="text" id="canvasName" class="name-input" placeholder="Enter design name">
+              <div class="save-btn-container">
+                <button id="saveBtn" class="save-btn">SAVE AS</button>
+                <div id="saveOptions" class="save-options" style="display: none;">
+                  <button id="saveAsComponent" class="save-option-btn">SAVE AS COMPONENT</button>
+                  <button id="saveAsComposition" class="save-option-btn">SAVE AS COMPOSITION</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dimension Controls -->
+          <div class="dimension-controls">
+            <div class="dimension-group">
+              <label>SIZE:</label>
+              <span id="currentDimensions">16 x 16</span>
+              <input type="number" id="widthInput" class="dimension-input" min="1" max="256" value="16">
+              <span class="dimension-separator">×</span>
+              <input type="number" id="heightInput" class="dimension-input" min="1" max="256" value="16">
+              <button id="applyDimensionsBtn" class="dimension-btn">APPLY</button>
+            </div>
+          </div>
+
+          <!-- Canvas Wrapper -->
+          <div class="canvas-wrapper">
+            <div id="pixelGrid" class="pixel-grid"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Export Window -->
+      <div class="export-window">
+        <div class="saved-items">
+          <!-- Fonts Section -->
+          <div class="saved-section">
+            <div class="saved-header">
+              <h3 id="fontsTitle">FONTS (0)</h3>
+              <button id="clearFontsBtn" class="clear-saved-btn">CLEAR</button>
+            </div>
+            <div class="font-creator">
+              <!-- Font Editing Notification -->
+              <div id="fontEditNotification" class="font-edit-notification" style="display: none;">
+                <div class="font-edit-notification-content">
+                  <span id="fontEditNotificationText">Editing character</span>
+                  <button id="fontEditNotificationClose" class="font-edit-notification-close">✕</button>
+                </div>
+              </div>
+              
+              <div class="font-creator-controls">
+                <input type="text" id="fontNameInput" class="font-name-input" placeholder="Font name">
+                <button id="createFontBtn" class="create-font-btn">CREATE</button>
+              </div>
+            </div>
+            <div class="saved-list">
+              <div id="fontsList"></div>
+            </div>
+          </div>
+
+          <!-- Components Section -->
+          <div class="saved-section">
+            <div class="saved-header">
+              <h3 id="componentsTitle">COMPONENTS (0)</h3>
+              <button id="clearComponentsBtn" class="clear-saved-btn">CLEAR</button>
+            </div>
+            <div class="saved-list">
+              <div id="componentsList"></div>
+            </div>
+          </div>
+
+          <!-- Compositions Section -->
+          <div class="saved-section">
+            <div class="saved-header">
+              <h3 id="compositionsTitle">COMPOSITIONS (0)</h3>
+              <button id="clearCompositionsBtn" class="clear-saved-btn">CLEAR</button>
+            </div>
+            <div class="saved-list">
+              <div id="compositionsList"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="export-header">
+          <h3>ARDUINO CODE:</h3>
+          <button id="copyCodeBtn" class="copy-code-btn" title="Copy Arduino code">❐</button>
+        </div>
+        <div class="protocol-selector">
+          <div class="protocol-group">
+            <label>PROTOCOL:</label>
+            <div class="protocol-options">
+              <label class="protocol-option">
+                <input type="radio" name="protocol" value="standard" checked>
+                <span>STANDARD</span>
+              </label>
+              <label class="protocol-option">
+                <input type="radio" name="protocol" value="spi">
+                <span>SPI</span>
+              </label>
+              <label class="protocol-option">
+                <input type="radio" name="protocol" value="i2c">
+                <span>I2C</span>
+              </label> 
+            </div> 
+          </div>
+          <div class="protocol-group">
+            <label>FORMAT:</label>
+            <div class="protocol-options">
+              <label class="protocol-option">
+                <input type="radio" name="format" value="monochrome" checked>
+                <span>MONOCHROME</span>
+              </label>
+              <label class="protocol-option">
+                <input type="radio" name="format" value="color">
+                <span>COLOR</span>
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="protocol-selector" id="subFormatSelector" style="display: none;">
+          <div class="protocol-group">
+            <label>OUTPUT FORMAT:</label>
+            <div class="protocol-options">
+              <!-- Color format options -->
+              <div id="colorFormatOptions" style="display: none;">
+                <label class="protocol-option">
+                  <input type="radio" name="subformat" value="color-2d" checked>
+                  <span>2D ARRAY (COLOR)</span>
+                </label>
+                <label class="protocol-option">
+                  <input type="radio" name="subformat" value="color-1d">
+                  <span>SINGLE BITMAP – HEX (1D FLAT ARRAY)</span>
+                </label>
+                <label class="protocol-option">
+                  <input type="radio" name="subformat" value="color-bmp">
+                  <span>BMP FILE (EXTERNAL FILE FORMAT)</span>
+                </label>
+                <label class="protocol-option">
+                  <input type="radio" name="subformat" value="color-palette">
+                  <span>PALETTE-BASED INDEXED COLOR</span>
+                </label>
+              </div>
+              
+              <!-- Monochrome format options -->
+              <div id="monochromeFormatOptions" style="display: none;">
+                <label class="protocol-option">
+                  <input type="radio" name="subformat" value="mono-2d" checked>
+                  <span>2D ARRAY (MONOCHROME)</span>
+                </label>
+                <label class="protocol-option">
+                  <input type="radio" name="subformat" value="mono-binary">
+                  <span>SINGLE BITMAP – BINARY PACKED</span>
+                </label>
+                <label class="protocol-option">
+                  <input type="radio" name="subformat" value="mono-hex">
+                  <span>SINGLE BITMAP – HEX (PACKED)</span>
+                </label>
+                <label class="protocol-option">
+                  <input type="radio" name="subformat" value="mono-xbm">
+                  <span>XBM FORMAT (HEADER FILE)</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="export-content">
+          <div id="exportContent" class="export-text">Click EXPORT button to generate code...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Confirm Modal -->
+  <div id="confirmModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>CONFIRM ACTION</h3>
+      </div>
+      <div class="modal-body">
+        <p id="confirmMessage">Are you sure?</p>
+      </div>
+      <div class="modal-actions">
+        <button id="confirmYes" class="modal-btn modal-btn-yes">YES</button>
+        <button id="confirmNo" class="modal-btn modal-btn-no">NO</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Alert Modal -->
+  <div id="alertModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>NOTIFICATION</h3>
+      </div>
+      <div class="modal-body">
+        <p id="alertMessage">Message</p>
+      </div>
+      <div class="modal-actions">
+        <button id="alertOk" class="modal-btn modal-btn-yes">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
