@@ -6,8 +6,8 @@ import * as DOM from './domElements.js';
 // Font storage key
 const FONTS_STORAGE_KEY = 'smolui_fonts';
 
-// Current state
-let currentEditingFont = null;
+// Current state - use global currentEditingFont from saveManager
+// let currentEditingFont = null; // Removed - use global one
 let fonts = [];
 
 // Initialize font functionality
@@ -19,12 +19,16 @@ export function initializeFontManager() {
 
 // Load fonts from localStorage
 export function loadFontsFromStorage() {
+  console.log('loadFontsFromStorage: Starting to load fonts from storage');
   const storedFonts = localStorage.getItem(FONTS_STORAGE_KEY);
+  console.log('loadFontsFromStorage: Raw stored fonts:', storedFonts);
   fonts = storedFonts ? JSON.parse(storedFonts) : [];
+  console.log('loadFontsFromStorage: Parsed fonts:', fonts);
+  console.log('loadFontsFromStorage: Fonts loaded successfully');
 }
 
 // Save fonts to localStorage
-function saveFontsToStorage() {
+export function saveFontsToStorage() {
   localStorage.setItem(FONTS_STORAGE_KEY, JSON.stringify(fonts));
 }
 
@@ -63,14 +67,18 @@ export function createFont() {
 
 // Update fonts list display
 export function updateFontsList() {
+  console.log('updateFontsList: Starting to update fonts list display');
   const fontsList = DOM.fontsList;
   const fontsTitle = DOM.fontsTitle;
   
+  console.log('updateFontsList: DOM elements found:', { fontsList, fontsTitle });
+  
   // Update title with count
-  fontsTitle.textContent = `FONTS (${fonts.length})`;
+  fontsTitle.textContent = `🔤`;
   
   // Clear existing content
   fontsList.innerHTML = '';
+  console.log('updateFontsList: Cleared existing content');
   
   if (fonts.length === 0) {
     fontsList.innerHTML = '<div class="saved-empty">No fonts created yet</div>';
@@ -78,35 +86,64 @@ export function updateFontsList() {
   }
   
   fonts.forEach((font, index) => {
+    console.log(`updateFontsList: Processing font "${font.name}" at index ${index}:`, font);
+    
     const fontItem = document.createElement('div');
     fontItem.className = 'font-item';
     fontItem.id = `font-${index}`;
     
     // Check if this font is in edit mode
-    const isInEditMode = currentEditingFont === index;
+    const isInEditMode = window.currentEditingFont === font.name;
     if (isInEditMode) {
       fontItem.classList.add('font-edit-mode');
     }
     
+    // Count characters with data for the expand button - handle both hex and rgb formats
+    const charactersWithData = font.characters ? Object.keys(font.characters).filter(char => {
+      const charData = font.characters[char];
+      return charData && charData.some(row => row.some(pixel => 
+        pixel !== '#000000' && pixel !== 'rgb(0, 0, 0)' && pixel !== '' && pixel !== 'transparent'
+      ));
+    }).length : 0;
+    
+    console.log(`updateFontsList: Font "${font.name}" has ${charactersWithData} characters with data`);
+    
     fontItem.innerHTML = `
       <div class="font-item-header">
-        <span class="font-item-name">${escapeHtml(font.name)}</span>
-        <div class="font-item-buttons">
-          <button class="font-item-edit" data-font-index="${index}">${isInEditMode ? 'EXIT' : 'EDIT'}</button>
-          <button class="font-item-delete" data-font-index="${index}">DEL</button>
+        <span class="font-item-name" data-font-index="${index}" data-font-name="${escapeHtml(font.name)}">${escapeHtml(font.name)}</span>
+        <span class="font-char-count">(${charactersWithData} chars)</span>
+        <div class="font-item-menu">
+          ${isInEditMode ? 
+            `<button class="font-menu-btn exit-btn" data-font-index="${index}">EXIT</button>` :
+            `<button class="font-menu-btn" data-font-index="${index}" data-font-name="${escapeHtml(font.name)}">•••</button>
+             <div class="font-menu-dropdown" style="display: none;">
+               <button class="font-menu-option edit-option" data-font-index="${index}">EDIT</button>
+               <button class="font-menu-option export-option" data-font-name="${escapeHtml(font.name)}">EXPORT</button>
+               <button class="font-menu-option delete-option" data-font-index="${index}">DEL</button>
+             </div>`
+          }
         </div>
       </div>
-      <div class="font-characters"></div>
+      <div class="font-characters" style="display: none;"></div>
     `;
     
     fontsList.appendChild(fontItem);
     
-    // Render characters for this font
+    // Render characters for this font (but keep hidden initially)
     renderFontCharacters(index);
   });
   
   // Attach event listeners
   attachFontItemListeners();
+  
+  // Close dropdowns when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.font-item-menu')) {
+      document.querySelectorAll('.font-menu-dropdown').forEach(dropdown => {
+        dropdown.style.display = 'none';
+      });
+    }
+  });
 }
 
 // Render font characters
@@ -118,7 +155,7 @@ function renderFontCharacters(fontIndex) {
     if (!fontContainer) return;
     
     // Check if this font is in edit mode
-    const isInEditMode = currentEditingFont === fontIndex;
+    const isInEditMode = window.currentEditingFont === font.name;
     
     // Add or remove font-edit-mode class
     if (isInEditMode) {
@@ -141,14 +178,23 @@ function renderFontCharacters(fontIndex) {
         charButton.className = 'font-character';
         charButton.textContent = char;
         
-        // Check if character has saved data
+        // Check if character has saved data - handle both hex and rgb formats
         const hasData = font.characters && font.characters[char] && 
                        font.characters[char].some(row => 
-                           row.some(pixel => pixel !== '#000000')
+                           row.some(pixel => 
+                               pixel !== '#000000' && pixel !== 'rgb(0, 0, 0)' && pixel !== '' && pixel !== 'transparent'
+                           )
                        );
+        
+        // Debug: Log character data for this specific character
+        if (font.characters && font.characters[char]) {
+            console.log(`renderFontCharacters: Character "${char}" data:`, font.characters[char]);
+            console.log(`renderFontCharacters: Character "${char}" hasData:`, hasData);
+        }
         
         if (hasData) {
             charButton.classList.add('has-data');
+            console.log(`renderFontCharacters: Added has-data class to character "${char}"`);
         }
         
         charButton.addEventListener('click', () => editFontCharacter(fontIndex, char));
@@ -158,21 +204,112 @@ function renderFontCharacters(fontIndex) {
 
 // Attach event listeners to font items
 function attachFontItemListeners() {
-  // Edit buttons
-  document.querySelectorAll('.font-item-edit').forEach(btn => {
+  // Menu button click to toggle dropdown (only for non-exit buttons)
+  document.querySelectorAll('.font-menu-btn:not(.exit-btn)').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const menuContainer = btn.closest('.font-item-menu');
+      const dropdown = menuContainer.querySelector('.font-menu-dropdown');
+      
+      // Close all other dropdowns first
+      document.querySelectorAll('.font-menu-dropdown').forEach(d => {
+        if (d !== dropdown) {
+          d.style.display = 'none';
+        }
+      });
+      
+      // Toggle current dropdown
+      dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+    });
+  });
+  
+  // Exit button click to exit edit mode
+  document.querySelectorAll('.font-menu-btn.exit-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const fontIndex = parseInt(btn.dataset.fontIndex);
+      
+      console.log('Exit button clicked for font index:', fontIndex);
+      
+      // Exit edit mode
       toggleFontEdit(fontIndex);
     });
   });
   
-  // Delete buttons
-  document.querySelectorAll('.font-item-delete').forEach(btn => {
+  // Edit option
+  document.querySelectorAll('.edit-option').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const fontIndex = parseInt(btn.dataset.fontIndex);
+      
+      console.log('Edit option clicked for font index:', fontIndex);
+      
+      // Enter edit mode first
+      toggleFontEdit(fontIndex);
+      
+      // After entering edit mode, expand the font to show characters
+      setTimeout(() => {
+        const fontItem = document.getElementById(`font-${fontIndex}`);
+        console.log('Font item found after edit mode:', fontItem);
+        
+        if (fontItem) {
+          const charactersContainer = fontItem.querySelector('.font-characters');
+          console.log('Characters container found after edit mode:', charactersContainer);
+          
+          if (charactersContainer) {
+            console.log('Setting characters container to display block');
+            charactersContainer.style.display = 'block';
+            fontItem.classList.add('expanded');
+            console.log('Added expanded class to font item');
+          } else {
+            console.error('Characters container not found after edit mode');
+          }
+        } else {
+          console.error('Font item not found after edit mode for index:', fontIndex);
+        }
+      }, 100); // Small delay to ensure DOM is updated
+      
+      // Close dropdown after action
+      const dropdown = btn.closest('.font-menu-dropdown');
+      dropdown.style.display = 'none';
+    });
+  });
+  
+  // Delete option
+  document.querySelectorAll('.delete-option').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const fontIndex = parseInt(btn.dataset.fontIndex);
       deleteFont(fontIndex);
+      
+      // Close dropdown after action
+      const dropdown = btn.closest('.font-menu-dropdown');
+      dropdown.style.display = 'none';
+    });
+  });
+  
+  // Export option
+  document.querySelectorAll('.export-option').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const fontName = btn.dataset.fontName;
+      exportFontAsAdafruitGFX(fontName);
+      
+      // Close dropdown after action
+      const dropdown = btn.closest('.font-menu-dropdown');
+      dropdown.style.display = 'none';
+    });
+  });
+
+  // Font name clicks - expand font and show export code
+  document.querySelectorAll('.font-item-name').forEach(nameSpan => {
+    nameSpan.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const fontIndex = parseInt(nameSpan.dataset.fontIndex);
+      const fontName = nameSpan.dataset.fontName;
+      
+      // Expand the font to show characters
+      expandFontAndShowExport(fontIndex, fontName);
     });
   });
   
@@ -186,11 +323,57 @@ function attachFontItemListeners() {
   });
 }
 
+// Expand/collapse font and show export code
+function expandFontAndShowExport(fontIndex, fontName) {
+  const fontItem = document.getElementById(`font-${fontIndex}`);
+  if (!fontItem) return;
+  
+  const charactersContainer = fontItem.querySelector('.font-characters');
+  const isExpanded = fontItem.classList.contains('expanded');
+  
+  if (isExpanded) {
+    // Collapse the font
+    charactersContainer.style.display = 'none';
+    fontItem.classList.remove('expanded');
+  } else {
+    // Expand the font to show characters
+    charactersContainer.style.display = 'block';
+    fontItem.classList.add('expanded');
+    
+    // Generate and display the export code for this font
+    if (window.generateAdafruitGFXFont) {
+      try {
+        const exportCode = window.generateAdafruitGFXFont(fontName);
+        console.log('Generated export code for font:', fontName, exportCode);
+        
+        if (window.updateExportCodeWithFont) {
+          window.updateExportCodeWithFont(fontName);
+          console.log('Updated export code with font');
+          
+          // Update copy button state after showing font code
+          if (window.updateCopyButtonState) {
+            setTimeout(() => window.updateCopyButtonState(), 100);
+          }
+        } else {
+          console.error('updateExportCodeWithFont function not available');
+        }
+      } catch (error) {
+        console.error('Error generating export code:', error);
+      }
+    } else {
+      console.error('generateAdafruitGFXFont function not available');
+    }
+  }
+}
+
 // Toggle font edit mode
 function toggleFontEdit(fontIndex) {
-    if (currentEditingFont === fontIndex) {
+    const font = fonts[fontIndex];
+    if (!font) return;
+    
+    if (window.currentEditingFont === font.name) {
         // Exit edit mode
-        currentEditingFont = null;
+        window.currentEditingFont = null;
         if (window.exitFontEditMode) {
             window.exitFontEditMode();
         }
@@ -200,7 +383,12 @@ function toggleFontEdit(fontIndex) {
         }
     } else {
         // Enter edit mode
-        currentEditingFont = fontIndex;
+        window.currentEditingFont = font.name;
+        // Also set the global variable in saveManager
+        if (window.enterFontEditMode) {
+            // Enter edit mode with a default character (e.g., 'A')
+            window.enterFontEditMode(font.name, 'A');
+        }
     }
     updateFontsList();
 }
@@ -218,60 +406,42 @@ function editFontCharacter(fontIndex, char) {
     
     console.log('editFontCharacter:', { fontIndex, char, hasData, font });
     
-    if (currentEditingFont === fontIndex) {
-        // In edit mode
-        if (hasData) {
-            // Enter font edit mode FIRST (before loading data)
-            if (window.enterFontEditMode) {
-                window.enterFontEditMode(font.name, char);
-            }
-            
-            // Get character data dimensions
-            const characterData = font.characters[char];
-            const height = characterData.length;
-            const width = characterData[0] ? characterData[0].length : 16;
-            
-            console.log('Loading character data:', { characterData, width, height });
-            
-            // Convert 2D array to 1D array for loadDataToCanvas
-            const pixelData = [];
-            for (let y = 0; y < height; y++) {
-                for (let x = 0; x < width; x++) {
-                    pixelData.push(characterData[y][x] || '#000000');
-                }
-            }
-            
-            console.log('Converted pixel data:', pixelData);
-            
-            // Load data to canvas with proper dimensions
-            if (window.loadDataToCanvas) {
-                window.loadDataToCanvas(pixelData, width, height);
-            }
-        } else {
-            // Enter font edit mode FIRST
-            if (window.enterFontEditMode) {
-                window.enterFontEditMode(font.name, char);
-            }
-            
-            // Clear canvas for new design
-            if (window.clearCanvas) {
-                window.clearCanvas();
+    // Always enter font edit mode when clicking on a character
+    if (window.enterFontEditMode) {
+        window.enterFontEditMode(font.name, char);
+    }
+    
+    if (hasData) {
+        // Get character data dimensions
+        const characterData = font.characters[char];
+        const height = characterData.length;
+        const width = characterData[0] ? characterData[0].length : 16;
+        
+        console.log('Loading character data:', { characterData, width, height });
+        
+        // Convert 2D array to 1D array for loadDataToCanvas
+        const pixelData = [];
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                pixelData.push(characterData[y][x] || '#000000');
             }
         }
         
-        // Show edit notification
-        showFontEditNotification(font.name, char);
+        console.log('Converted pixel data:', pixelData);
+        
+        // Load data to canvas with proper dimensions
+        if (window.loadDataToCanvas) {
+            window.loadDataToCanvas(pixelData, width, height);
+        }
     } else {
-        // Not in edit mode - activate type tool for characters with data
-        if (hasData) {
-            activateTypeToolForCharacter(font.name, char);
-        } else {
-            // No data - show message
-            if (window.showAlert) {
-                window.showAlert(`Character "${char}" has no saved design. Enter edit mode to create one.`);
-            }
+        // Clear canvas for new design
+        if (window.clearCanvas) {
+            window.clearCanvas();
         }
     }
+    
+    // Show edit notification
+    showFontEditNotification(font.name, char);
 }
 
 // Activate type tool for character
@@ -332,6 +502,21 @@ export function saveFontCharacter(fontIndex, char, characterData) {
   if (!font) return;
   
   font.characters[char] = characterData;
+  
+  // Update font dimensions based on new logic:
+  // - Width: Individual per character
+  // - Height: Universal across all characters in the font
+  if (window.getCanvasDimensions) {
+    const { width, height } = window.getCanvasDimensions();
+    
+    // Update this character's width individually
+    updateCharacterWidth(font.name, char, width);
+    
+    // Update height universally for all characters in the font
+    // Use default bottom anchor since we don't have resize context here
+    updateFontCharactersHeight(font.name, height, 'bottom');
+  }
+  
   saveFontsToStorage();
   updateFontsList();
   
@@ -395,10 +580,157 @@ export function getAllFonts() {
   return fonts;
 }
 
+// Get fonts array
+export function getFontsArray() {
+  return fonts;
+}
+
 // Get font character data
 export function getFontCharacterData(fontName, char) {
   const font = getFontByName(fontName);
   return font ? font.characters[char] : null;
+}
+
+// Update all characters in a font with new canvas dimensions
+export function updateFontCharactersDimensions(fontName, newWidth, newHeight, resizeAnchor = 'bottom') {
+  const font = getFontByName(fontName);
+  if (!font || !font.characters) return;
+  
+  console.log(`Updating font "${fontName}" characters: width to ${newWidth}, height to ${newHeight} with anchor: ${resizeAnchor}`);
+  
+  // Get all characters in the font
+  const characterKeys = Object.keys(font.characters);
+  
+  characterKeys.forEach(char => {
+    const characterData = font.characters[char];
+    if (characterData && Array.isArray(characterData)) {
+      // Resize the character data to match new dimensions with proper anchor
+      const resizedData = resizeCharacterData(characterData, newWidth, newHeight, resizeAnchor);
+      font.characters[char] = resizedData;
+      console.log(`Resized character "${char}" to ${newWidth}x${newHeight} with anchor: ${resizeAnchor}`);
+    }
+  });
+  
+  // Save the updated font to storage
+  saveFontsToStorage();
+  console.log(`All characters in font "${fontName}" updated: width=${newWidth}, height=${newHeight} with anchor: ${resizeAnchor}`);
+}
+
+// Update only the height of all characters in a font (universal height)
+export function updateFontCharactersHeight(fontName, newHeight, resizeAnchor = 'bottom') {
+  const font = getFontByName(fontName);
+  if (!font || !font.characters) return;
+  
+  console.log(`=== updateFontCharactersHeight DEBUG START ===`);
+  console.log(`Font name: "${fontName}"`);
+  console.log(`New height: ${newHeight}`);
+  console.log(`Resize anchor parameter: "${resizeAnchor}"`);
+  console.log(`Resize anchor type: ${typeof resizeAnchor}`);
+  console.log(`Number of characters to update: ${Object.keys(font.characters).length}`);
+  
+  // Get all characters in the font
+  const characterKeys = Object.keys(font.characters);
+  
+  characterKeys.forEach((char, index) => {
+    const characterData = font.characters[char];
+    if (characterData && Array.isArray(characterData)) {
+      // Get current width of this character
+      const currentWidth = characterData[0] ? characterData[0].length : 14;
+      console.log(`Updating character "${char}" (${index + 1}/${characterKeys.length}):`);
+      console.log(`  Current dimensions: ${currentWidth}x${characterData.length}`);
+      console.log(`  New height: ${newHeight}`);
+      console.log(`  Resize anchor: "${resizeAnchor}"`);
+      
+      // Resize the character data to match new height while preserving width and respecting anchor
+      const resizedData = resizeCharacterData(characterData, currentWidth, newHeight, resizeAnchor);
+      font.characters[char] = resizedData;
+      console.log(`  Updated character "${char}" height to ${newHeight} (width remains ${currentWidth}) with anchor: ${resizeAnchor}`);
+    }
+  });
+  
+  // Don't save to storage here - let the main save function handle it
+  console.log(`All characters in font "${fontName}" height updated to ${newHeight} with anchor: ${resizeAnchor} (not saved to storage yet)`);
+  console.log(`=== updateFontCharactersHeight DEBUG END ===`);
+}
+
+// Update only the width of a specific character (individual width)
+export function updateCharacterWidth(fontName, character, newWidth) {
+  const font = getFontByName(fontName);
+  if (!font || !font.characters || !font.characters[character]) return;
+  
+  console.log(`Updating character "${character}" width to ${newWidth} in font "${fontName}"`);
+  
+  const characterData = font.characters[character];
+  if (characterData && Array.isArray(characterData)) {
+    // Get current height of this character
+    const currentHeight = characterData.length;
+    // Resize the character data to match new width while preserving height
+    const resizedData = resizeCharacterData(characterData, newWidth, currentHeight);
+    font.characters[character] = resizedData;
+    console.log(`Updated character "${character}" width to ${newWidth} (height remains ${currentHeight})`);
+    
+    // Don't save to storage here - let the main save function handle it
+    console.log(`Character "${character}" width updated to ${newWidth} (not saved to storage yet)`);
+  }
+}
+
+// Helper function to resize character data
+function resizeCharacterData(characterData, newWidth, newHeight, resizeAnchor = 'bottom') {
+  const oldHeight = characterData.length;
+  const oldWidth = oldHeight > 0 ? characterData[0].length : 0;
+  
+  console.log(`resizeCharacterData: Resizing from ${oldWidth}x${oldHeight} to ${newWidth}x${newHeight} with anchor: ${resizeAnchor}`);
+  console.log(`resizeCharacterData: Anchor type check:`);
+  console.log(`  Is top anchor: ${resizeAnchor === 'top' || resizeAnchor === 'top-left' || resizeAnchor === 'top-right'}`);
+  console.log(`  Is bottom anchor: ${resizeAnchor === 'bottom' || resizeAnchor === 'bottom-left' || resizeAnchor === 'bottom-right'}`);
+  console.log(`  Full anchor value: "${resizeAnchor}"`);
+  
+  // Create new resized data array
+  const resizedData = [];
+  
+  for (let y = 0; y < newHeight; y++) {
+    const row = [];
+    for (let x = 0; x < newWidth; x++) {
+      let pixelColor = '#000000'; // Default to black
+      
+      if (y < oldHeight && x < oldWidth) {
+        // Calculate source position based on resize anchor
+        let sourceY = y;
+        
+        if (resizeAnchor === 'top' || resizeAnchor === 'top-left' || resizeAnchor === 'top-right') {
+          // When resizing from top, pixels move down
+          // For expanding: new pixels added at top, existing content moves down
+          // For shrinking: pixels removed from top, existing content moves up
+          if (newHeight > oldHeight) {
+            // Expanding - existing content moves down
+            sourceY = y - (newHeight - oldHeight);
+            console.log(`Top anchor expanding: y=${y}, sourceY=${sourceY}, offset=${newHeight - oldHeight}`);
+          } else {
+            // Shrinking - existing content moves up
+            sourceY = y + (oldHeight - newHeight);
+            console.log(`Top anchor shrinking: y=${y}, sourceY=${sourceY}, offset=${oldHeight - newHeight}`);
+          }
+        } else if (resizeAnchor === 'bottom' || resizeAnchor === 'bottom-left' || resizeAnchor === 'bottom-right') {
+          // When resizing from bottom, pixels stay in place
+          // For expanding: new pixels added at bottom
+          // For shrinking: pixels removed from bottom
+          sourceY = y;
+          console.log(`Bottom anchor: y=${y}, sourceY=${sourceY}`);
+        }
+        
+        // Check if source position is valid
+        if (sourceY >= 0 && sourceY < oldHeight) {
+          pixelColor = characterData[sourceY][x] || '#000000';
+        }
+      }
+      
+      row.push(pixelColor);
+    }
+    resizedData.push(row);
+  }
+  
+  console.log(`resizeCharacterData: Resize completed with anchor: ${resizeAnchor}`);
+  return resizedData;
 }
 
 // Attach font event listeners
@@ -408,10 +740,7 @@ function attachFontEventListeners() {
         DOM.createFontBtn.addEventListener('click', createFont);
     }
     
-    // Clear fonts button
-    if (DOM.clearFontsBtn) {
-        DOM.clearFontsBtn.addEventListener('click', clearAllFonts);
-    }
+
     
     // Font selector change
     if (DOM.fontSelector) {
@@ -491,7 +820,89 @@ function showFontEditNotification(fontName, character) {
 
 // Hide font edit notification
 export function hideFontEditNotification() {
-  if (DOM.fontEditNotification) {
-    DOM.fontEditNotification.style.display = 'none';
-  }
+    if (DOM.fontEditNotification) {
+        DOM.fontEditNotification.style.display = 'none';
+    }
+}
+
+// Export font as Adafruit_GFX header file
+function exportFontAsAdafruitGFX(fontName) {
+    if (window.generateAdafruitGFXFont) {
+        const headerCode = window.generateAdafruitGFXFont(fontName);
+        
+        // Update export code area to show the generated code
+        if (window.updateExportCodeWithFont) {
+            window.updateExportCodeWithFont(fontName);
+        }
+        
+        // Create a download link
+        const blob = new Blob([headerCode], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${fontName.replace(/[^A-Z0-9]/gi, '_')}_font.h`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        if (window.showAlert) {
+            window.showAlert(`Font "${fontName}" exported as Adafruit_GFX header file!`);
+        }
+    } else {
+        if (window.showAlert) {
+            window.showAlert('Font export functionality not available. Please check if the app is fully loaded.');
+        }
+    }
+}
+
+// Export character as Adafruit_GFX character file
+function exportCharacterAsAdafruitGFX(fontName, char) {
+    const font = getFontByName(fontName);
+    if (!font) {
+        if (window.showAlert) window.showAlert('Font not found.');
+        return;
+    }
+
+    const characterData = font.characters[char];
+    if (!characterData) {
+        if (window.showAlert) window.showAlert(`Character '${char}' not found in font '${fontName}'.`);
+        return;
+    }
+
+    const headerCode = window.generateAdafruitGFXCharacter(fontName, char);
+
+    // Update export code area to show the generated code
+    if (window.updateExportCodeWithCharacter) {
+        window.updateExportCodeWithCharacter(fontName, char);
+    }
+    
+    // Create a download link
+    const blob = new Blob([headerCode], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${fontName.replace(/[^A-Z0-9]/gi, '_')}_${char}.h`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    if (window.showAlert) {
+        window.showAlert(`Character '${char}' from font '${fontName}' exported as Adafruit_GFX character file!`);
+    }
+}
+
+// Show font export preview
+function showFontExportPreview(fontName) {
+    if (window.updateExportCodeWithFont) {
+        window.updateExportCodeWithFont(fontName);
+        if (window.showAlert) {
+            window.showAlert(`Showing Adafruit_GFX export code for font "${fontName}". Click the EXPORT button to download the header file.`);
+        }
+    } else {
+        if (window.showAlert) {
+            window.showAlert('Font export preview not available. Please check if the app is fully loaded.');
+        }
+    }
 }

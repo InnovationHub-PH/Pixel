@@ -57,7 +57,7 @@ function setupTypeEventListeners() {
             // Remove last character from canvas
             if (textCursorPosition !== null) {
                 const spacing = parseInt(DOM.typeSpacingSlider.value) || 0;
-                const characterWidth = 16;
+                const characterWidth = 14;
                 textCursorPosition -= characterWidth + spacing;
                 
                 // Clear the last character area
@@ -143,7 +143,7 @@ function setupTypeEventListeners() {
                 
                 // Move cursor position forward
                 const spacing = parseInt(DOM.typeSpacingSlider.value) || 0;
-                const characterWidth = 16;
+                const characterWidth = 14;
                 textCursorPosition += characterWidth + spacing;
                 
                 // Update cursor position on canvas
@@ -340,31 +340,52 @@ function toggleFontEditMode(fontName) {
 
 // Edit character
 function editCharacter(fontName, character) {
-    if (fontEditMode === fontName) {
-        // In edit mode: only paste to canvas and set name
-        const fonts = JSON.parse(localStorage.getItem('smolui_fonts') || '[]');
-        const font = fonts.find(f => f.name === fontName);
-        if (font && font.characters && font.characters[character]) {
-            // Load character data to canvas
-            const characterData = font.characters[character] || [];
-            loadCanvasFromData(characterData);
-            
-            // Set canvas name to font name and character
-            DOM.canvasName.value = `${fontName}_${character}`;
-        }
+    console.log('editCharacter called:', { fontName, character });
+    
+    // Always enter font edit mode when editing a character
+    if (window.enterFontEditMode) {
+        console.log('Calling enterFontEditMode...');
+        window.enterFontEditMode(fontName, character);
+        console.log('enterFontEditMode completed');
     } else {
-        // Normal mode: original behavior
-        const fonts = JSON.parse(localStorage.getItem('smolui_fonts') || '[]');
-        const font = fonts.find(f => f.name === fontName);
-        if (font && font.characters && font.characters[character]) {
-            // Load character data to canvas
-            const characterData = font.characters[character] || [];
-            loadCanvasFromData(characterData);
-            
-            // Set canvas name to font name and character
-            DOM.canvasName.value = `${fontName}_${character}`;
-        }
+        console.error('enterFontEditMode function not available');
     }
+    
+    // Load character data to canvas
+    const fonts = JSON.parse(localStorage.getItem('smolui_fonts') || '[]');
+    const font = fonts.find(f => f.name === fontName);
+    if (font && font.characters && font.characters[character]) {
+        console.log('Loading character data to canvas...');
+        // Load character data to canvas
+        const characterData = font.characters[character] || [];
+        loadCanvasFromData(characterData);
+        console.log('Character data loaded to canvas');
+        
+        // Set canvas name to font name and character
+        DOM.canvasName.value = `${fontName}_${character}`;
+        console.log('Canvas name set to:', DOM.canvasName.value);
+    } else {
+        console.log('No character data found for:', { fontName, character });
+    }
+    
+    // Check if reference lines are visible after everything
+    setTimeout(() => {
+        const container = document.querySelector('.reference-lines-container');
+        const baseline = document.querySelector('.baseline-line');
+        const vertical = document.querySelector('.vertical-line');
+        const handle = document.querySelector('.intersection-handle');
+        
+        console.log('Reference line check after editCharacter:', {
+            container: !!container,
+            baseline: !!baseline,
+            vertical: !!vertical,
+            handle: !!handle
+        });
+        
+        if (!container) {
+            console.warn('Reference lines container not found after editCharacter!');
+        }
+    }, 100);
 }
 
 // Load canvas from data
@@ -504,7 +525,7 @@ export function showTextPreview(startIndex) {
     
     // Get spacing from slider
     const spacing = parseInt(DOM.typeSpacingSlider.value) || 0;
-    const characterWidth = 16; // Each character is 16x16
+    const characterWidth = 14; // Each character is 14x14
     const spaceWidth = 8; // Space character width
     
     for (const char of text) {
@@ -578,10 +599,10 @@ function showTextCursor(index) {
     // Clear previous cursor pixels
     clearCursorPixels();
     
-    // Get font height (default 16 pixels)
+    // Get font height (default 14 pixels)
     const fonts = JSON.parse(localStorage.getItem('smolui_fonts') || '[]');
     const fontData = fonts.find(f => f.name === selectedFont);
-    const fontHeight = fontData && fontData.characters['A'] ? fontData.characters['A'].length : 16;
+    const fontHeight = fontData && fontData.characters['A'] ? fontData.characters['A'].length : 14;
     
     // Highlight vertical stack of pixels matching font height
     for (let row = 0; row < fontHeight; row++) {
@@ -695,7 +716,7 @@ function findLineStartPosition(currentPosition) {
 // Update counts
 export function updateCounts() {
     const fonts = JSON.parse(localStorage.getItem('smolui_fonts') || '[]');
-    DOM.fontsTitle.textContent = `FONTS (${fonts.length})`;
+    DOM.fontsTitle.textContent = `🔤`;
 }
 
 // Placeholder for modal functions

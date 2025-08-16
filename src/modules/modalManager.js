@@ -19,28 +19,38 @@ export function showConfirm(message, onConfirm) {
     DOM.confirmMessage.textContent = message;
     DOM.confirmModal.style.display = 'flex';
     
-    // Remove any existing event listeners
-    const newConfirmYes = DOM.confirmYes.cloneNode(true);
-    const newConfirmNo = DOM.confirmNo.cloneNode(true);
-    DOM.confirmYes.parentNode.replaceChild(newConfirmYes, DOM.confirmYes);
-    DOM.confirmNo.parentNode.replaceChild(newConfirmNo, DOM.confirmNo);
-    
-    // Add new event listeners
-    newConfirmYes.onclick = function() {
+    // Simple event handling without cloning
+    const handleConfirm = () => {
         DOM.confirmModal.style.display = 'none';
         if (onConfirm) onConfirm();
+        // Remove event listeners
+        DOM.confirmYes.removeEventListener('click', handleConfirm);
+        DOM.confirmNo.removeEventListener('click', handleCancel);
     };
     
-    newConfirmNo.onclick = function() {
+    const handleCancel = () => {
         DOM.confirmModal.style.display = 'none';
+        // Remove event listeners
+        DOM.confirmYes.removeEventListener('click', handleConfirm);
+        DOM.confirmNo.removeEventListener('click', handleCancel);
     };
+    
+    // Add event listeners
+    DOM.confirmYes.addEventListener('click', handleConfirm);
+    DOM.confirmNo.addEventListener('click', handleCancel);
     
     // Close on overlay click
-    DOM.confirmModal.addEventListener('click', (e) => {
+    const handleOverlayClick = (e) => {
         if (e.target === DOM.confirmModal) {
             DOM.confirmModal.style.display = 'none';
+            // Remove event listeners
+            DOM.confirmYes.removeEventListener('click', handleConfirm);
+            DOM.confirmNo.removeEventListener('click', handleCancel);
+            DOM.confirmModal.removeEventListener('click', handleOverlayClick);
         }
-    });
+    };
+    
+    DOM.confirmModal.addEventListener('click', handleOverlayClick);
 }
 
 // Show alert modal

@@ -71,6 +71,37 @@ export function updateExportCode() {
     }
     
     DOM.exportContent.textContent = code;
+    console.log('updateExportCode: Content updated with code length:', code.length);
+    
+    // Update copy button state after updating export content
+    if (window.updateCopyButtonState) {
+        console.log('updateExportCode: Calling updateCopyButtonState');
+        window.updateCopyButtonState();
+    } else {
+        console.log('updateExportCode: updateCopyButtonState not available');
+    }
+}
+
+// Update export code with font export
+export function updateExportCodeWithFont(fontName) {
+    const headerCode = generateAdafruitGFXFont(fontName);
+    DOM.exportContent.textContent = headerCode;
+    
+    // Update copy button state after updating export content
+    if (window.updateCopyButtonState) {
+        window.updateCopyButtonState();
+    }
+}
+
+// Update export code with character export
+export function updateExportCodeWithCharacter(fontName, character) {
+    const headerCode = generateAdafruitGFXCharacter(fontName, character);
+    DOM.exportContent.textContent = headerCode;
+    
+    // Update copy button state after updating export content
+    if (window.updateCopyButtonState) {
+        window.updateCopyButtonState();
+    }
 }
 
 // Generate standard protocol code
@@ -98,6 +129,285 @@ function generateI2CCode(pixelData, format, subFormat, canvasWidth, canvasHeight
     } else {
         return generateColorCode(pixelData, subFormat, 'I2C', canvasWidth, canvasHeight);
     }
+}
+
+// Generate Adafruit_GFX font header file
+export function generateAdafruitGFXFont(fontName) {
+    const fonts = JSON.parse(localStorage.getItem('smolui_fonts') || '[]');
+    const font = fonts.find(f => f.name === fontName);
+    
+    if (!font || !font.characters) {
+        return '// Font not found or has no characters';
+    }
+    
+    // Define character set (standard ASCII printable characters)
+    const characters = ' !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~';
+    
+    // Debug: Show what characters actually exist in the font
+    console.log(`Font "${fontName}" has characters:`, Object.keys(font.characters));
+    console.log(`Looking for characters in range: 0x20 (space) to 0x7E (tilde)`);
+    
+    // Build glyph data and bitmap data
+    const glyphs = [];
+    const bitmapData = [];
+    let currentBitmapOffset = 0;
+    
+    // Process each character in ASCII order
+    for (let i = 0; i < characters.length; i++) {
+        const char = characters[i];
+        const charCode = char.charCodeAt(0);
+        
+        if (font.characters[char]) {
+            // Character exists in font
+            const charData = font.characters[char];
+            const charWidth = charData[0].length;
+            const charHeight = charData.length;
+            
+            // Debug: Show first character's data structure
+            if (char === 'A') {
+                console.log(`Character 'A' data:`, charData);
+                console.log(`First row:`, charData[0]);
+                console.log(`Sample pixels:`, charData[0].slice(0, 8));
+                
+                // Count different colors in the character
+                const colorCounts = {};
+                for (let y = 0; y < charHeight; y++) {
+                    for (let x = 0; x < charWidth; x++) {
+                        const color = charData[y][x];
+                        colorCounts[color] = (colorCounts[color] || 0) + 1;
+                    }
+                }
+                console.log(`Color distribution:`, colorCounts);
+                
+                // Show visual representation of first few rows
+                console.log(`Visual representation (first 4 rows):`);
+                for (let y = 0; y < Math.min(4, charHeight); y++) {
+                    let visualRow = '';
+                    for (let x = 0; x < Math.min(8, charWidth); x++) {
+                        const pixel = charData[y][x];
+                        if (pixel !== '#000000' && pixel !== '' && pixel !== 'rgb(0, 0, 0)') {
+                            visualRow += '█'; // Filled pixel
+                        } else {
+                            visualRow += '·'; // Empty pixel
+                        }
+                    }
+                    console.log(`Row ${y}: ${visualRow}`);
+                }
+            }
+            
+            // Calculate bytes needed for this character (8 pixels per byte, MSB first)
+            const bytesPerRow = Math.ceil(charWidth / 8);
+            const totalBytes = bytesPerRow * charHeight;
+            
+            // Create glyph structure
+            const glyph = {
+                bitmapOffset: currentBitmapOffset,
+                width: charWidth,
+                height: charHeight,
+                xAdvance: charWidth + 1, // Add 1 pixel spacing
+                xOffset: 0,
+                yOffset: 0
+            };
+            
+            glyphs.push(glyph);
+            
+            // Convert pixel data to bitmap bytes
+            for (let y = 0; y < charHeight; y++) {
+                const row = charData[y];
+                for (let x = 0; x < charWidth; x += 8) {
+                    let byte = 0;
+                    for (let bit = 0; bit < 8; bit++) {
+                        if (x + bit < charWidth) {
+                            const pixel = row[x + bit];
+                            // Debug: Log first few pixels to see what we're getting
+                            if (y === 0 && x < 16) {
+                                console.log(`Pixel at (${x + bit}, ${y}): "${pixel}"`);
+                            }
+                            // Convert color to binary (filled pixel = 1, empty/background = 0)
+                            // For 1-bit fonts: 1 = ink pixel, 0 = background pixel
+                            if (pixel !== '#000000' && pixel !== '' && pixel !== 'rgb(0, 0, 0)') {
+                                // This is a filled pixel (ink) - set bit to 1
+                                byte |= (1 << (7 - bit));
+                            }
+                            // Empty/background pixels (black/transparent) remain 0
+                        }
+                    }
+                    bitmapData.push(byte);
+                }
+            }
+            
+            // Update bitmap offset for next character
+            currentBitmapOffset += totalBytes;
+            
+            // Debug: Show bitmap conversion for first character
+            if (char === 'A') {
+                console.log(`Character 'A' bitmap conversion:`);
+                console.log(`- Size: ${charWidth}x${charHeight}`);
+                console.log(`- Bytes per row: ${Math.ceil(charWidth / 8)}`);
+                console.log(`- Total bytes: ${totalBytes}`);
+                console.log(`- Bitmap offset: ${glyph.bitmapOffset}`);
+                
+                // Show first few bytes of bitmap data
+                const startIndex = bitmapData.length - totalBytes;
+                const firstBytes = bitmapData.slice(startIndex, startIndex + 4);
+                console.log(`- First 4 bytes:`, firstBytes.map(b => `0x${b.toString(16).padStart(2, '0')}`));
+            }
+            
+            console.log(`Character '${char}' (0x${charCode.toString(16)}): ${charWidth}x${charHeight}, ${totalBytes} bytes, offset ${glyph.bitmapOffset}`);
+            
+        } else {
+            // Character doesn't exist in font - create empty glyph
+            glyphs.push({
+                bitmapOffset: currentBitmapOffset,
+                width: 0,
+                height: 0,
+                xAdvance: 8, // Standard space width
+                xOffset: 0,
+                yOffset: 0
+            });
+            // No bitmap data added for empty characters
+            console.log(`Character '${char}' (0x${charCode.toString(16)}): empty, offset ${currentBitmapOffset}`);
+        }
+    }
+    
+    // Debug summary
+    console.log(`Font "${fontName}" generated:`);
+    console.log(`- Total glyphs: ${glyphs.length}`);
+    console.log(`- Total bitmap bytes: ${bitmapData.length}`);
+    console.log(`- Bitmap data:`, bitmapData);
+    
+    let headerCode = `// Adafruit_GFX Font Header for "${fontName}"
+// Generated by SMOL UI
+
+#ifndef ${fontName.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_FONT_H
+#define ${fontName.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_FONT_H
+
+#include <Adafruit_GFX.h>
+
+// Font dimensions
+#define ${fontName.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_FONT_WIDTH 16
+#define ${fontName.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_FONT_HEIGHT 16
+
+// Font reference line positions (for alignment)
+${font.referenceLines && font.referenceLines.baseline !== undefined && font.referenceLines.vertical !== undefined ? 
+`#define ${fontName.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_BASELINE_Y ${font.referenceLines.baseline}
+#define ${fontName.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_VERTICAL_X ${font.referenceLines.vertical}` : 
+`// Reference line positions not set for this font`}
+
+// Character bitmap data
+const uint8_t ${fontName.replace(/[^A-Z0-9]/g, '_')}_font_bitmaps[] PROGMEM = {
+  ${bitmapData.map(b => `0x${b.toString(16).padStart(2, '0')}`).join(', ')}
+};
+
+// Character glyph data
+const GFXglyph ${fontName.replace(/[^A-Z0-9]/g, '_')}_font_glyphs[] PROGMEM = {
+`;
+
+    // Add glyph structures
+    for (let i = 0; i < glyphs.length; i++) {
+        const glyph = glyphs[i];
+        const char = characters[i];
+        headerCode += `  { ${glyph.bitmapOffset}, ${glyph.width}, ${glyph.height}, ${glyph.xAdvance}, ${glyph.xOffset}, ${glyph.yOffset} }, // 0x${char.charCodeAt(0).toString(16).padStart(2, '0')} '${char}'\n`;
+    }
+    
+    headerCode += `};
+
+// Font structure for Adafruit_GFX
+const GFXfont ${fontName.replace(/[^A-Z0-9]/g, '_')}_font PROGMEM = {
+  ${fontName.replace(/[^A-Z0-9]/g, '_')}_font_bitmaps,
+  ${fontName.replace(/[^A-Z0-9]/g, '_')}_font_glyphs,
+  0x20, // First character (space)
+  0x7E, // Last character (tilde)
+  24 // yAdvance (baseline height)
+};
+
+#endif // ${fontName.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_FONT_H
+`;
+    
+    return headerCode;
+}
+
+// Generate Adafruit_GFX font header for a specific character
+export function generateAdafruitGFXCharacter(fontName, character) {
+    const fonts = JSON.parse(localStorage.getItem('smolui_fonts') || '[]');
+    const font = fonts.find(f => f.name === fontName);
+    
+    if (!font || !font.characters || !font.characters[character]) {
+        return '// Character not found';
+    }
+    
+    const charData = font.characters[character];
+    const charWidth = charData[0].length;
+    const charHeight = charData.length;
+    
+    // Convert 2D pixel data to bitmap bytes (8 pixels per byte, MSB first)
+    const bitmapData = [];
+    for (let y = 0; y < charHeight; y++) {
+        const row = charData[y];
+        for (let x = 0; x < charWidth; x += 8) {
+            let byte = 0;
+            for (let bit = 0; bit < 8; bit++) {
+                if (x + bit < charWidth) {
+                    const pixel = row[x + bit];
+                    // Convert color to binary (filled pixel = 1, empty/background = 0)
+                    // For 1-bit fonts: 1 = ink pixel, 0 = background pixel
+                    if (pixel !== '#000000' && pixel !== '' && pixel !== 'rgb(0, 0, 0)') {
+                        // This is a filled pixel (ink) - set bit to 1
+                        byte |= (1 << (7 - bit));
+                    }
+                    // Empty/background pixels (black/transparent) remain 0
+                }
+            }
+            bitmapData.push(byte);
+        }
+    }
+    
+    let headerCode = `// Adafruit_GFX Character Header for "${character}" from font "${fontName}"
+// Generated by SMOL UI
+
+#ifndef ${fontName.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_${character.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_CHAR_H
+#define ${fontName.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_${character.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_CHAR_H
+
+#include <Adafruit_GFX.h>
+
+// Character dimensions
+#define ${fontName.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_${character.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_WIDTH ${charWidth}
+#define ${fontName.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_${character.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_HEIGHT ${charHeight}
+
+// Font reference line positions (for alignment)
+${font.referenceLines && font.referenceLines.baseline !== undefined && font.referenceLines.vertical !== undefined ? 
+`#define ${fontName.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_BASELINE_Y ${font.referenceLines.baseline}
+#define ${fontName.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_VERTICAL_X ${font.referenceLines.vertical}` : 
+`// Reference line positions not set for this font`}
+
+// Character bitmap data
+const uint8_t ${fontName.replace(/[^A-Z0-9]/g, '_')}_${character.replace(/[^A-Z0-9]/g, '_')}_bitmaps[] PROGMEM = {
+  ${bitmapData.map(b => `0x${b.toString(16).padStart(2, '0')}`).join(', ')}
+};
+
+// Character glyph structure for Adafruit_GFX
+const GFXglyph ${fontName.replace(/[^A-Z0-9]/g, '_')}_${character.replace(/[^A-Z0-9]/g, '_')}_glyph PROGMEM = {
+  0, // Bitmap offset (always 0 for single character)
+  ${charWidth}, // Width
+  ${charHeight}, // Height
+  ${charWidth + 1}, // X advance (width + 1 pixel spacing)
+  0, // X offset
+  0  // Y offset
+};
+
+// Font structure for Adafruit_GFX (single character font)
+const GFXfont ${fontName.replace(/[^A-Z0-9]/g, '_')}_${character.replace(/[^A-Z0-9]/g, '_')}_font PROGMEM = {
+  ${fontName.replace(/[^A-Z0-9]/g, '_')}_${character.replace(/[^A-Z0-9]/g, '_')}_bitmaps,
+  &${fontName.replace(/[^A-Z0-9]/g, '_')}_${character.replace(/[^A-Z0-9]/g, '_')}_glyph,
+  ${character.charCodeAt(0)}, // First character
+  ${character.charCodeAt(0)}, // Last character (same as first for single character)
+  24 // yAdvance (baseline height)
+};
+
+#endif // ${fontName.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_${character.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_CHAR_H
+`;
+    
+    return headerCode;
 }
 
 // Generate monochrome code
@@ -146,11 +456,38 @@ function generateMono2DArray(pixelData, protocol, canvasWidth, canvasHeight) {
         rows.push(`  {${row.join(', ')}}`);
     }
     
+    // Get reference line positions if available (for font editing)
+    let referenceLineInfo = '';
+    if (window.getReferenceLinePositions) {
+        const refPositions = window.getReferenceLinePositions();
+        if (refPositions.baseline !== undefined && refPositions.vertical !== undefined) {
+            referenceLineInfo = `
+// Reference Line Positions (for font alignment)
+#define BASELINE_Y ${refPositions.baseline}
+#define VERTICAL_X ${refPositions.vertical}`;
+        }
+    }
+    
+    // If in font edit mode, also try to get font-level reference line positions
+    if (window.getSaveState && window.getSaveState().isFontEditMode) {
+        const saveState = window.getSaveState();
+        if (saveState.currentEditingFont) {
+            const fonts = JSON.parse(localStorage.getItem('smolui_fonts') || '[]');
+            const font = fonts.find(f => f.name === saveState.currentEditingFont);
+            if (font && font.referenceLines) {
+                referenceLineInfo = `
+// Font Reference Line Positions (shared across all characters)
+#define FONT_BASELINE_Y ${font.referenceLines.baseline}
+#define FONT_VERTICAL_X ${font.referenceLines.vertical}`;
+            }
+        }
+    }
+    
     return `// ${canvasWidth}x${canvasHeight} Pixel Art - ${protocol} Protocol (2D Array Monochrome)
-// Generated by 16x16 Pixel Art Editor
+// Generated by 14x14 Pixel Art Editor
 
 #define CANVAS_WIDTH ${canvasWidth}
-#define CANVAS_HEIGHT ${canvasHeight}
+#define CANVAS_HEIGHT ${canvasHeight}${referenceLineInfo}
 
 const uint8_t pixelData[CANVAS_HEIGHT][CANVAS_WIDTH] PROGMEM = {
 ${rows.join(',\n')}
@@ -195,7 +532,7 @@ function generateMonoBinaryPacked(pixelData, protocol, canvasWidth, canvasHeight
     });
     
     return `// ${canvasWidth}x${canvasHeight} Pixel Art - ${protocol} Protocol (Binary Packed Monochrome)
-// Generated by 16x16 Pixel Art Editor
+// Generated by 14x14 Pixel Art Editor
 
 #define CANVAS_WIDTH ${canvasWidth}
 #define CANVAS_HEIGHT ${canvasHeight}
@@ -237,7 +574,7 @@ function generateMonoHexPacked(pixelData, protocol, canvasWidth, canvasHeight) {
     const bytesArray = convertToBytes(pixelData);
     
     return `// ${canvasWidth}x${canvasHeight} Pixel Art - ${protocol} Protocol (Hex Packed Monochrome)
-// Generated by 16x16 Pixel Art Editor
+// Generated by 14x14 Pixel Art Editor
 
 #define CANVAS_WIDTH ${canvasWidth}
 #define CANVAS_HEIGHT ${canvasHeight}

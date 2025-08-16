@@ -43,9 +43,12 @@ function setupToolEventListeners() {
                 exitTypingMode();
             }
             
-            // Exit font edit mode when switching tools
-            if (window.exitFontEditMode) {
-                window.exitFontEditMode();
+            // Don't exit font edit mode when switching tools
+            // This allows users to switch tools while editing a character
+            
+            // Clear brush preview when switching tools
+            if (window.clearBrushPreview) {
+                window.clearBrushPreview();
             }
         });
     });
@@ -108,12 +111,37 @@ export function setActiveTool(tool) {
     // Show/hide type tool controls
     updateToolControls();
     updateColorControlsVisibility();
+    
+    // Don't exit font edit mode when switching tools programmatically
+    // This allows users to switch tools while editing a character
+}
+
+// Deselect all tools (for component placement mode)
+export function deselectAllTools() {
+    currentTool = null;
+    window.currentTool = null;
+    
+    console.log('All tools deselected');
+    
+    // Remove active class from all tool buttons
+    DOM.toolButtons.forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // Hide all tool-specific controls
+    updateToolControls();
+    updateColorControlsVisibility();
 }
 
 // Update tool-specific controls
 export function updateToolControls() {
     if (currentTool === 'type') {
         DOM.typeToolGroup.style.display = 'flex';
+        DOM.brushShapeGroup.style.display = 'none';
+        DOM.sizeGroup.style.display = 'none';
+    } else if (currentTool === null) {
+        // No tool selected (component placement mode)
+        DOM.typeToolGroup.style.display = 'none';
         DOM.brushShapeGroup.style.display = 'none';
         DOM.sizeGroup.style.display = 'none';
     } else {

@@ -21,11 +21,56 @@ export function updateExportContent(canvasData = null) {
   
   if (!canvasData) {
     DOM.exportContent.textContent = 'Click SAVE button to generate code...';
+    updateCopyButtonState();
     return;
   }
   
   const code = generateArduinoCode(canvasData);
   DOM.exportContent.textContent = code;
+  updateCopyButtonState();
+}
+
+// Update copy button state based on export content
+export function updateCopyButtonState() {
+  console.log('updateCopyButtonState called');
+  console.log('DOM.copyCodeBtn:', DOM.copyCodeBtn);
+  console.log('DOM.exportContent:', DOM.exportContent);
+  
+  if (!DOM.copyCodeBtn || !DOM.exportContent) {
+    console.log('Required DOM elements not found, returning');
+    return;
+  }
+  
+  const content = DOM.exportContent.textContent;
+  console.log('updateCopyButtonState called - content:', content);
+  console.log('Content length:', content ? content.length : 'null');
+  console.log('Content trimmed length:', content ? content.trim().length : 'null');
+  
+  const hasCode = content && 
+                  content !== 'Click SAVE button to generate code...' && 
+                  content !== 'Click EXPORT button to generate code...' &&
+                  content.trim().length > 0;
+  
+  console.log('hasCode:', hasCode);
+  console.log('Content !== placeholder 1:', content !== 'Click SAVE button to generate code...');
+  console.log('Content !== placeholder 2:', content !== 'Click EXPORT button to generate code...');
+  console.log('Content trimmed length > 0:', content ? content.trim().length > 0 : false);
+  
+  if (hasCode) {
+    DOM.copyCodeBtn.disabled = false;
+    DOM.copyCodeBtn.classList.remove('disabled');
+    DOM.copyCodeBtn.title = 'Copy Arduino code';
+    console.log('Button ENABLED');
+    console.log('Button disabled property:', DOM.copyCodeBtn.disabled);
+    console.log('Button classes:', DOM.copyCodeBtn.className);
+  } else {
+    DOM.copyCodeBtn.disabled = true;
+    DOM.copyCodeBtn.classList.add('disabled');
+    DOM.copyCodeBtn.title = 'No code to copy';
+    console.log('Button DISABLED');
+    console.log('Button disabled property:', DOM.copyCodeBtn.disabled);
+    console.log('Button classes:', DOM.copyCodeBtn.className);
+  }
 }
 
 // Generate Arduino code based on canvas data and current settings

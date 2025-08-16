@@ -2,15 +2,23 @@
 // Centralized DOM element selections
 
 // Color Controls
-export const colorPicker = document.getElementById('colorPicker');
-export const colorDisplay = document.getElementById('colorDisplay');
+export const drawColorPicker = document.getElementById('drawColorPicker');
+export const drawColorDisplay = document.getElementById('drawColorDisplay');
+export const fillColorPicker = document.getElementById('fillColorPicker');
+export const fillColorDisplay = document.getElementById('fillColorDisplay');
 
 // Tools and Controls
-export const toolButtons = document.querySelectorAll('.tool-btn');
+export const toolButtons = document.querySelectorAll('.tool-icon-btn[data-tool]');
 export const shapeButtons = document.querySelectorAll('.shape-btn');
-export const brushSize = document.getElementById('brushSize');
-export const brushSizeValue = document.getElementById('brushSizeValue');
 export const clearBtn = document.getElementById('clearBtn');
+
+// Draw Tool Controls
+export const drawBrushSize = document.getElementById('drawBrushSize');
+export const drawBrushSizeValue = document.getElementById('drawBrushSizeValue');
+
+// Erase Tool Controls
+export const eraseBrushSize = document.getElementById('eraseBrushSize');
+export const eraseBrushSizeValue = document.getElementById('eraseBrushSizeValue');
 
 // Type Tool Controls
 export const typeToolGroup = document.getElementById('typeToolGroup');
@@ -21,8 +29,10 @@ export const typeSpacingSlider = document.getElementById('typeSpacingSlider');
 export const typeSpacingValue = document.getElementById('typeSpacingValue');
 
 // Tool Groups
-export const brushShapeGroup = document.getElementById('brushShapeGroup');
-export const sizeGroup = document.getElementById('sizeGroup');
+export const drawShapeGroup = document.getElementById('drawShapeGroup');
+export const drawSizeGroup = document.getElementById('drawSizeGroup');
+export const eraseShapeGroup = document.getElementById('eraseShapeGroup');
+export const eraseSizeGroup = document.getElementById('eraseSizeGroup');
 
 // Canvas Controls
 export const pixelGrid = document.getElementById('pixelGrid');
@@ -34,25 +44,26 @@ export const saveAsComposition = document.getElementById('saveAsComposition');
 export const widthInput = document.getElementById('widthInput');
 export const heightInput = document.getElementById('heightInput');
 export const applyDimensionsBtn = document.getElementById('applyDimensionsBtn');
+export const quickWidthSelector = document.getElementById('quickWidthSelector');
+export const quickHeightSelector = document.getElementById('quickHeightSelector');
 export const currentDimensions = document.getElementById('currentDimensions');
 
-// Canvas Tabs
-export const tabButtons = document.querySelectorAll('.tab-btn');
+
 
 // Font Management
 export const fontNameInput = document.getElementById('fontNameInput');
 export const createFontBtn = document.getElementById('createFontBtn');
 export const fontsList = document.getElementById('fontsList');
 export const fontsTitle = document.getElementById('fontsTitle');
-export const clearFontsBtn = document.getElementById('clearFontsBtn');
+
 
 // Saved Items
 export const componentsList = document.getElementById('componentsList');
 export const componentsTitle = document.getElementById('componentsTitle');
-export const clearComponentsBtn = document.getElementById('clearComponentsBtn');
+
 export const compositionsList = document.getElementById('compositionsList');
 export const compositionsTitle = document.getElementById('compositionsTitle');
-export const clearCompositionsBtn = document.getElementById('clearCompositionsBtn');
+
 
 // Font Edit Notification
 export const fontEditNotification = document.getElementById('fontEditNotification');
@@ -92,4 +103,3 @@ console.log('DOM Elements loaded:', {
 // Utility function to get elements by data attribute
 export const getToolButton = (tool) => document.querySelector(`[data-tool="${tool}"]`);
 export const getShapeButton = (shape) => document.querySelector(`[data-shape="${shape}"]`);
-export const getTabButton = (canvas) => document.querySelector(`[data-canvas="${canvas}"]`);
